@@ -19,7 +19,6 @@
 */
 
 
-
 #include "System.h"
 #include "Converter.h"
 #include <thread>
@@ -29,9 +28,11 @@
 namespace ORB_SLAM2
 {
 
+    ///-----------------------构造函数初始化列表
 System::System(const string &strVocFile, const string &strSettingsFile, const eSensor sensor,
-               const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)), mbReset(false),mbActivateLocalizationMode(false),
-        mbDeactivateLocalizationMode(false)
+               const bool bUseViewer):mSensor(sensor), mpViewer(static_cast<Viewer*>(NULL)),
+                                      mbReset(false),mbActivateLocalizationMode(false),
+                                      mbDeactivateLocalizationMode(false)
 {
     // Output welcome message
     cout << endl <<
@@ -50,6 +51,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
         cout << "RGB-D" << endl;
 
     //Check settings file
+    /// 检查设置问文件 strSettingsFile.xml
     cv::FileStorage fsSettings(strSettingsFile.c_str(), cv::FileStorage::READ);
     if(!fsSettings.isOpened())
     {
@@ -59,10 +61,11 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
 
     //Load ORB Vocabulary
+    /// 加载ORB字典 .txt
     cout << endl << "Loading ORB Vocabulary. This could take a while..." << endl;
 
     mpVocabulary = new ORBVocabulary();
-    bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);
+    bool bVocLoad = mpVocabulary->loadFromTextFile(strVocFile);  //vocabu文件内容判断
     if(!bVocLoad)
     {
         cerr << "Wrong path to vocabulary. " << endl;
@@ -72,29 +75,37 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     cout << "Vocabulary loaded!" << endl << endl;
 
     //Create KeyFrame Database
+    /// 创建关键帧数据
     mpKeyFrameDatabase = new KeyFrameDatabase(*mpVocabulary);
 
     //Create the Map
+    /// 创建图
     mpMap = new Map();
 
     //Create Drawers. These are used by the Viewer
+    //// 创建视图
     mpFrameDrawer = new FrameDrawer(mpMap);
+    /// 创建画图器
     mpMapDrawer = new MapDrawer(mpMap, strSettingsFile);
 
     //Initialize the Tracking thread
     //(it will live in the main thread of execution, the one that called this constructor)
+    /// 初始化追踪线程（这里是构造函数）
     mpTracker = new Tracking(this, mpVocabulary, mpFrameDrawer, mpMapDrawer,
                              mpMap, mpKeyFrameDatabase, strSettingsFile, mSensor);
 
     //Initialize the Local Mapping thread and launch
-    mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);
-    mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);
+    /// 初始化局部建图线程和启动
+    mpLocalMapper = new LocalMapping(mpMap, mSensor==MONOCULAR);  //局部绘图器
+    mptLocalMapping = new thread(&ORB_SLAM2::LocalMapping::Run,mpLocalMapper);  //局部建图
 
     //Initialize the Loop Closing thread and launch
-    mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);
-    mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);
+    /// 初始化闭环检测线程和启动
+    mpLoopCloser = new LoopClosing(mpMap, mpKeyFrameDatabase, mpVocabulary, mSensor!=MONOCULAR);  // 闭环检测器
+    mptLoopClosing = new thread(&ORB_SLAM2::LoopClosing::Run, mpLoopCloser);  //闭环检测线程
 
     //Initialize the Viewer thread and launch
+    /// 初始化绘图线程和启动
     if(bUseViewer)
     {
         mpViewer = new Viewer(this, mpFrameDrawer,mpMapDrawer,mpTracker,strSettingsFile);
@@ -103,6 +114,7 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
     }
 
     //Set pointers between threads
+    /// 设置线程间的指针
     mpTracker->SetLocalMapper(mpLocalMapper);
     mpTracker->SetLoopClosing(mpLoopCloser);
 
@@ -224,13 +236,16 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
 
     // Check mode change
-    {
+    /// 检查模式更改
+
+    {  // 大括号指明了变量的作用域，在大括号内声明的局部变量其作用域自变量声明始，到大括号之后终结
         unique_lock<mutex> lock(mMutexMode);
         if(mbActivateLocalizationMode)
         {
             mpLocalMapper->RequestStop();
 
             // Wait until Local Mapping has effectively stopped
+            /// 等待局部建图停止
             while(!mpLocalMapper->isStopped())
             {
                 usleep(1000);
@@ -248,6 +263,7 @@ cv::Mat System::TrackMonocular(const cv::Mat &im, const double &timestamp)
     }
 
     // Check reset
+    /// 检查复位
     {
     unique_lock<mutex> lock(mMutexReset);
     if(mbReset)
@@ -490,3 +506,73 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
 }
 
 } //namespace ORB_SLAM
+
+////------------------------学习内容-------------
+
+/**# 析构函数后面加冒号称为（初始化列表）
+ *
+ * 有四种情况为：
+ * 1.初始化const成员；
+ * 2.初始化引用成员；
+ * eg:
+ * class A
+   {
+    public:
+        A(int &v) : i(v), p(v), j(v) {}
+        void print_val() { cout << "hello:" << i << "  " << j << endl;}
+    private:
+        const int i;
+        int p;
+        int &j;
+    };
+    <const对象或引用只能初始化但是不能赋值。构造函数的函数体内只能做赋值而不是初始化，
+    因此初始化const对象或引用的唯一机会是构造函数函数体之前的初始化列表中。>
+
+ * 3.当调用基类的构造函数，而他拥有一组参数时；
+ * eg:
+ * class Base
+ * {
+    public:
+        Base(int a) : val(a) {}
+    private:
+        int val;
+    };
+
+    class A : public Base
+    {
+    public:
+        A(int v) : p(v), Base(v) {}
+        void print_val() {
+        cout << "hello:" << p << endl;}
+    private:
+        int p;
+    };
+
+ * 4.当调用成员类的构造函数，而他拥有一组参数时。
+ * eg:
+ * class Base
+ * {
+    public:
+        Base(int a) : val(a) {}
+    private:
+        int val;
+    };
+
+    class A
+    {
+    public:
+        A(int v) : p(v), b(v) {}
+        void print_val() {
+        cout << "hello:" << p << endl;}
+    private:
+        int p;
+        Base b;
+    };
+
+    < 原因同样是创建对象时，要初始类成员的每一个成员(如果没有在初始化列表里面，编译器会自动使用它的默认的构造函数进行初始化，
+    但是它没有默认构造函数，所以会编译报错，所以没有默认构造函数的成员变量需要使用初始化列表进行初始化)>
+*/
+
+/**# mutex（互斥锁）
+ * 多个线程访问同一资源时，为了保证数据的一致性，最简单的方式就是使用 mutex（互斥锁）
+*/

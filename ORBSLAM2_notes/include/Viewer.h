@@ -19,8 +19,8 @@
 */
 
 
-#ifndef VIEWER_H
-#define VIEWER_H
+#ifndef _VIEWER_H_
+#define _VIEWER_H_
 
 #include "FrameDrawer.h"
 #include "MapDrawer.h"
@@ -44,6 +44,7 @@ public:
 
     // Main thread function. Draw points, keyframes, the current camera pose and the last processed
     // frame. Drawing is refreshed according to the camera fps. We use Pangolin.
+    //主线程功能。绘制点、关键帧、当前摄像机姿态和最后处理帧.根据相机FPS刷新绘图。我们使用Pangolin库。
     void Run();
 
     void RequestFinish();
@@ -86,6 +87,6 @@ private:
 }
 
 
-#endif // VIEWER_H
+#endif // _VIEWER_H
 	
 
